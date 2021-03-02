@@ -1,0 +1,156 @@
+# TODO: review full EBNF for any possible logical errors in connections
+# REMEMBER: the language is not type-based, meaning variable type should be determined only at runtime,
+#           which means function call values should be determined at runtime also
+
+Program = StatementList
+        ;
+
+StatementList = Statement StatementList # with small changes regarding 'begin' syntax in S-expression
+              | Statement
+              ;
+
+Statement = VarDecl
+          | Expr ('#EOL' {{ !if && !while}} | '')
+          ;
+
+Expr = IfExpr
+     | WhileExpr
+     | VarAssign
+     | BooleanExpr
+     | AddExpr
+     ;
+
+VarDecl = 'var' Identifier '=' AddExpr # separate cases for VarAssign and the other
+        | 'var' Identifier 
+        ;
+
+VarAssign = Identifier '=' Expr
+          ;
+
+WhileExpr = 'while' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT'
+          ;
+
+IfExpr = 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' IfExpr 
+       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' WhileExpr 
+       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' ':' '#EOL' '#INDENT' StatementList
+       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList
+       ;
+
+# BooleanExpr = BooleanLiteral 'and' BooleanExpr
+#             | BooleanLiteral
+#             ;
+
+
+BoolExpr = EqExpr 'or' BoolExpr(!AndExpr)
+         | EqExpr 'and' BoolExpr(!OrExpr)
+         ;
+         
+EqExpr = RelExpr 'is' RelExpr                                                # not matching 4 == 3, 4 == true
+       | RelExpr 'is' 'not' RelExpr # special case: treated as 'is not'
+       | RelExpr
+       ;
+
+RelExpr = AddExpr '<' AddExpr
+        | AddExpr '>' AddExpr                        
+        | AddExpr '<=' AddExpr
+        | AddExpr '>=' AddExpr
+        | 'not' BoolExpr                        # prove me wrong
+        | ( "true" | "false" | "nothing"??? )
+        ;
+
+AddExpr = MulExpr '+' AddExpr
+        | ( MulExpr '-' MulExpr ) ( ( '+' | '-' ) AddExpr )?
+        | MulExpr
+        ;
+
+MulExpr = UnExpr '*' MulExpr
+        | ( UnExpr '/' UnExpr ) ( ( '*' | '/' ) MulExpr )?
+        | UnExpr
+        ;
+
+UnExpr = '+' PrimaryExpr        # to be done forward
+       | '-' PrimaryExpr
+       | PrimaryExpr
+       ;
+       
+PrimaryExpr = '(' BoolExpr ')' ######## forget right things mentioned: ===> change AddExpr to something superior (ex. BooleanExpression | Expression | Statement | Other...)
+            | Identifier
+            | Number
+            ;
+
+Identifier = {{ @ }}
+           ;
+
+# Literal = Number        # \ non-terminal
+#         | String        # |
+#         | Operator      # |
+#         ;               # /
+
+BooleanLiteral = "true"
+               | "false"
+               | "nothing"
+               ;
+               
+Number = {{ @ }}        # terminal
+       ;
+
+String = {{ @ }}
+       ;
+
+Operator = {{ @ }}
+         ;
+
+
+# Unary = '+' Unary
+#       | '-' Unary
+#       | PrimaryExpr
+#       ;
+
+
+## {{ @ }} refers to specific regex-similar implementation + recognition, which can be found & is done directly in the Tokenizer
+
+
+
+
+AddExpr = MulExpr "+" AddExpr
+        | MulExpr "-" AddExpr
+        | MulExpr
+        ;
+
+MulExpr = UnExpr "*" MulExpr
+        | UnExpr "/" MulExpr
+        | UnExpr
+        ;
+
+UnExpr = "+" PrimExpr
+       | "-" PrimExpr
+       | "!" PrimExpr
+       | PrimExpr
+       ;
+
+PrimaryExpr = "(" Expr ")"
+            | FunctionCall
+            | Identifier
+            | Literal  
+            ;
+
+FunctionCall = Identifier "(" (BoolExpr ("," BoolExpr)*)* ")"
+
+Literal = NumberLiteral
+        | StringLiteral
+        | BooleanLiteral
+        | NothingLiteral
+        ;
+
+Number = {{ @ }}        # terminal
+       ;
+
+String = {{ @ }}
+       ;
+
+BooleanLiteral = "true"
+               | "false"
+               ;
+
+NothingLiteral = "nothing"
+               ;
