@@ -33,6 +33,33 @@ compile = code => {
     console.log(generator.eval(parser.parse(tokenizer.tokenize(code))));
 }
 
+function Tokenize() {
+    var code = document.getElementById("code").value;
+    const tokenizer = new Tokenizer();
+    var tokenizedCode = tokenizer.tokenize(code);
+    document.getElementById("output").innerHTML = JSON.stringify(tokenizedCode);
+}
+
+function Parse() {
+    var code = document.getElementById("code").value;
+    const tokenizer = new Tokenizer(),
+        parser = new Parser();
+    var tokenizedCode = tokenizer.tokenize(code);
+    var parsedCode = parser.parse(tokenizedCode);
+    document.getElementById("output").innerHTML = JSON.stringify(parsedCode);
+}
+
+function Run() {
+    var code = document.getElementById("code").value;
+    const tokenizer = new Tokenizer(),
+        parser = new Parser(),
+        generator = new Generator();
+    var tokenizedCode = tokenizer.tokenize(code);
+    var parsedCode = parser.parse(tokenizedCode);
+    var generatedCode = generator.eval(parsedCode);
+    document.getElementById("output").innerHTML = generatedCode;
+}
+
 print_ = AST => {
     console.log(JSON.stringify(AST, null, 4));
 }
