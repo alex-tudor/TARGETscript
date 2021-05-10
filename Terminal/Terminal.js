@@ -15,160 +15,39 @@
  *      - adauga la creare func constructor, func destructor () (vezi finalization registry in JS pe MDN), 'my' si 'me' (membrul this, vezi functie in functie si 'this' kw shadowing)
  * - entitati
  *      - o entitate poate apartine acum unei clase / mai multe, iar mai apoi sa isi schimbe clasa de provenienta in altcineva = sa "paraseasca" clasa respectiva si sa se afilieze alteia /altora asemanatoare / diferite cu prima / primele
- * - dereferentiere (sintaxa (cu "." probabil + gaseste alt nume mai scurt)
+ * - dereferentiere sintaxa (cu "." probabil + gaseste alt nume mai scurt)
  * 
- * - e posibil sa implementam ceva care sa aiba sens in folosire, asemanator cu send() din Apple.nio?
- * 
+ * - e posibil sa implementam ceva care sa aiba send in folosire (send statement ca si cum ar fi return) 
+ * - file reader dintr-un 'terminal' diferit de pe site (un div cu contenteditable selectiv), cu instructiunea "read" in interiorul limbajului Target
  * - repara / decide te asupra functionalitatilor cu caracter temporar (marcate in comentarii cu "DEBATE:")
- *
+ * - instructiunea 'use <file_name>'
+ *     - obligatoriu va fi fisier '.tg' valid (pt alte fisiere vom avea o comunitate ex. File cu reader si writer streams incorporate si diferite pt fiecare fisier, pt ca e posibil sa existe concurrency)
  *************************************************
  */
 
+// Tokenize = code => new Tokenizer().tokenize(code);
+// Parse    = code => new Parser().parse(new Tokenizer().tokenize(code));
 
+compile  = code => new Generator().generate(new Parser().parse(new Tokenizer().tokenize(code)));
 
+const start = performance.now();
+fetch('./TargetFiles/test-file.tg')
+    .then(response => response.text())
+    .then(compile)
+    .catch(console.warn)
+    .finally(() => (console.log('%c' + (performance.now() - start), 'background: lightgreen; color: darkgreen; padding: 8px'), null))
+// community / group Apples:
+    // var color = "red"
+    // var size = 10.234
+    // var taste = "Appleish"
+    // func constructor (color, taste):
+    //     this.color = color
+    //     this.taste = taste
+    //     [this.color, this.taste]
 
-
-compile = code => {
-    const tokenizer = new Tokenizer(), parser = new Parser(), generator = new Generator();
-    console.log(generator.eval(parser.parse(tokenizer.tokenize(code))));
-}
-
-function Tokenize() {
-    var code = document.getElementById("code").value;
-    const tokenizer = new Tokenizer();
-    var tokenizedCode = tokenizer.tokenize(code);
-    document.getElementById("output").innerHTML = JSON.stringify(tokenizedCode);
-}
-
-function Parse() {
-    var code = document.getElementById("code").value;
-    const tokenizer = new Tokenizer(),
-        parser = new Parser();
-    var tokenizedCode = tokenizer.tokenize(code);
-    var parsedCode = parser.parse(tokenizedCode);
-    document.getElementById("output").innerHTML = JSON.stringify(parsedCode);
-}
-
-function Run() {
-    var code = document.getElementById("code").value;
-    const tokenizer = new Tokenizer(),
-        parser = new Parser(),
-        generator = new Generator();
-    var tokenizedCode = tokenizer.tokenize(code);
-    var parsedCode = parser.parse(tokenizedCode);
-    var generatedCode = generator.eval(parsedCode);
-    document.getElementById("output").innerHTML = generatedCode;
-}
-
-print_ = AST => {
-    console.log(JSON.stringify(AST, null, 4));
-}
-// console.log(compile(`3 * 3 - 2 / 2 * 1;`));
-// console.log(compile(`"abcd" "abcdefg"      
-
-
-
-// `));
-
-// compile(`
-// var a = 4
-//  `)
-
-
-
-// compile(`
-// var a = 0
-// var b = 0
-
-// a = b = 5 # let a = ( b = 5 ) be possible ( to be put var_assign inside primary_expr )
-// a
-// b
-// `)
-
-// compile(`
-// var a = 0
-// a = 12
-// while a > 1:
-//     a = a - 1
-//     a # a is a + 1
-// `)
-
-// AND and OR clauses are processed from Left to Right (same thingy INSIDE the Parentheses)
-// => bottom if condition = equiv. of: "(a is not 5) and (((a > 4) or (a > 1 and 1)) or 4)"
-// the if-clause returns false only when condition is false (nothing !== false)
-compile(`
-var contor = 16
-
-while contor is not 5:
-    print(contor)
-    contor = contor - 1
-`)
-// (new Generator()).eval(['begin', ['print', ['hey', 4], 2]]);
-
-// compile(`
-// var i = 7
-// func a():
-
-
-// while i is not 0:
-//     print(5)
-//     i = i - 1
-// `)
-
-// compile(`
-// var a = b = c = 7
-// `)
-
-// compile(`
-// var a = 0
-// var b = 1
-// var c = 2
-// if nothing:
-//     1
-// else if b - 2 * c + 1:
-//     2
-// else:
-//     0
-// `)
-
-// compile(`
-// var hours = 0                       # [hours]    = number of hours of working
-// var paycheck = 2000                 # [paycheck] = sum of money given at the end of the month
-// var progress = async while true:    # or just "async while true" or use the "instant" keyword before async (omit start progress line) - instant needs async to work
-//     hours += 1
-
-
-
-//     if hours == 24:
-//         hours = 0
-//     wait 1000
-
-// start progress
-
-// while true:
-//     while hours < 8:                
-//         continue
-//     day += 1
-//     if day == 30:
-//         salary += paycheck
-//         print "I just got " paycheck " euros. Now i have " salary " in total"
-//         day = 0
-//     wait 16000                      # waits 16 hours, but progress is async and still calculates
-// `)
-
-// // console.log(tokenizer.tokenize(`
-// // community Apple:
-// //     var color = "red"
-// //     var size = 10.234
-// //     var taste = "Appleish"
-// //     func constructor (color, taste):
-// //         this.color = color
-// //         this.taste = taste
-// //         [this.color, this.taste]
-
-// //     func destructor ():
-// //         print "Object is destroyed"
-// // `))
+    // func destructor ():
+    //     print "Object is destroyed"
+    // `))
 
 
 

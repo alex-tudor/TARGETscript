@@ -5,21 +5,36 @@ class Tokenizer {
     no ; or { } ever needed
     : needed after if expression condition (like Py, if a is 0: ... and tabs)
     get instructions after tabbing level (more research to be done)
+
+    REPAIR: because of sanitize problem, first line of input can have any indentation
+    REPAIR: problems appear when using newline after comments found in the first rows of program, make tokenizer delete that newlines before processing
+    REPAIR: tokenizer accepts 00000123 as a number, but not 0001.234 as a number (there is a problem with the isNum regex that is currently used)
+    REPAIR: 'func' ___ is not a function or something related happens because there is a full white line inside the function declaration (Tokenizer has to fix that) 
     */
     tokenize(input) {
-        // take in calculus typeof input !== "string"
-        input = input.trim(); // trim input to delete EOLs / spaces before or after input
+        if(typeof input !== "string")
+            ErrorHandler.InternalError("Input given to the Tokenizer is not of type 'string'.");
+
+        // REPAIR:
+        input = input.trimEnd(); // trim input to delete EOLs / spaces before or after input
+        input = input.replace(/\n(\s*\n)+/g, '\n'); // delete multiple succeeding EOLs
+        input = input.replace(/\r\n/g, '\n'); // in the Target files edited using a Windows environment, newline is marked internally using '\r\n' (on Linux / Mac, only '\n' is used), 
         input = input.replace(/( )+\n/g, '\n'); // delete trailing spaces before EOL
-        input = input.replace(/\n{2,}/g, '\n'); // delete multiple succeeding EOLs
-        input += '\n'; /*
-        ^^^^^^^^
-        Folosim instr de mai sus pt ca:
-        Exista cazuri in care structuri precum IF se incheie in cod cu EOF si 
-        intre cele doua se pune un DEDENT care blocheaza accesul la EOF.
-        De aceea, punem un EOL de la noi pentru a putea fi incadrat in IF
+        if(input !== "") // if file is not empty by now
+            input = input + '\n'; /*
+            ^^^^^^^^
+            Folosim instr de mai sus pt ca:
+            Exista cazuri in care structuri precum IF se incheie in cod cu EOF si 
+            intre cele doua se pune un DEDENT care blocheaza accesul la EOF.
+            De aceea, punem un EOL de la noi pentru a putea fi incadrat in IF
+            
+            sau
+
+            cazul in care ultimul statement se va incheia cu EOF, nu cu EOL
+            -   cu toate acestea, programul ar trebui sa fie valid
         */
         console.log(input);
-        this.reservedWords = ['if', 'else', 'var', /*'this'*/, 'true', 'false', 'while'];
+        this.reservedWords = ['if', 'else', 'while', 'var', 'func', /*'this'*/, 'print', 'error', 'true', 'false', 'nothing', 'type', 'of'];
         let opList = ['+', '-', '*', '/', '=', '<=', '>=', '<', '>', 'is', 'and', 'or', 'not', '(', ')', ',', '.'];
         const cursor = {
             pos: 0,
@@ -29,8 +44,8 @@ class Tokenizer {
             get char() {
                 return input.charAt(this.pos);
             },
-            hasBefore(char) {
-                return input.charAt(this.pos - 1) === char;
+            hasNext(regex) {
+                return regex.test(input.charAt(this.pos + 1));
             },
             get atEOF() {
                 return /^$/.test(this.char);
@@ -54,7 +69,7 @@ class Tokenizer {
                 return /^#$/.test(this.char);
             },
             get atNumStart() {
-                return /^[0-9]$/.test(this.char) || (this.char === `.` && /^[0-9]$/.test(input.charAt(this.pos + 1)));
+                return /^[0-9]$/.test(this.char);
             },
             get atStrStart() {
                 return /^"$/.test(this.char);
@@ -67,7 +82,7 @@ class Tokenizer {
                 return /^[A-Za-z_]$/.test(this.char);
             },
             get atPunctStart() {
-                return /^(\:|\[|\])$/.test(this.char);
+                return /^(\:|\[|\]|\^)$/.test(this.char);
             },
             advance() {
                 if (!this.atEOL) this.column++;
@@ -80,7 +95,7 @@ class Tokenizer {
         }, API = {
             output: [],
             isNum(token) {
-                return /^(((0|[1-9][0-9]*)\.?[0-9]*)|(\.[0-9]*))$/.test(token);
+                return /^(0|[1-9][0-9]*)\.?[0-9]*$/.test(token);
             },
             isStr(token) {
                 return /^"[^"]*"$/.test(token);
@@ -153,6 +168,7 @@ class Tokenizer {
 
             if (cursor.atCommentStart) {
                 API.skipWhile(() => !cursor.atEOL && !cursor.atEOF);
+                if(cursor.atEOL) cursor.advance();
                 continue;
             }
 
@@ -173,9 +189,12 @@ class Tokenizer {
                 while (true) {
                     if (cursor.atEOF || !API.isNum(token + cursor.char)) break;
 
-                    if (cursor.char === `.`)
-                        if (!dot) dot = true;
-                        else ErrorHandler.SyntaxError(`Double dot in number literal notation`); // to be changed into too many dots in number literal
+                    if (cursor.char === `.`) {
+                        if(dot) {
+                            ErrorHandler.SyntaxError(`Too many dots in your number`);
+                        }
+                        dot = true;
+                    }
                     token += cursor.char;
                     cursor.advance();
                 }

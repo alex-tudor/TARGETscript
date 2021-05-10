@@ -1,0 +1,9 @@
+print(type(4))
+
+func say(message, :greeting, :welcome = false):
+    if greeting is 4:
+        4
+    else:
+        2
+
+say("we love Target", welcome = true, greeting = "Hi,")

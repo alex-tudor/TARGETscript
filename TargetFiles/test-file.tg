@@ -1,0 +1,12 @@
+func say(:greeting, message, :welcome = false):
+    if welcome is not nothing:
+        print "Welcome!"
+    if greeting is not nothing:
+        print greeting, message
+    else:
+        print message
+
+say("we love Target", welcome = true, greeting = "Hi,")
+
+print true, false, nothing, 42, 3.14, "Target"
+error "This is a user-generated program error."

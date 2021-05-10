@@ -61,7 +61,7 @@
 
     #top {
         display: flex;
-        flex-wrap: wrap;
+        white-space: nowrap;
         align-items: center;
         position: absolute;
         left: 0;
@@ -108,16 +108,15 @@
             TARGET SCRIPT LANGUAGE PLAYGROUND
         </div>
         <!-- La tokenizer il puteti pune intr-un <pre> daca vreti pt ca "sa-i spuneti" html-ului ca e deja formatat -->
-        <input type="button" value="Tokenize" id="tokenize" class="top-btn" onclick="Tokenize()">
-        <input type="button" value="Parse" id="parse" class="top-btn" onclick="Parse()">
-        <input type="button" value="Run" id="run" class="top-btn" onclick="Run()">
+        <input type="button" value="Tokenize" id="tokenize" class="top-btn" onclick="Tokenize(document.querySelector('textarea').value)">
+        <input type="button" value="Parse" id="parse" class="top-btn" onclick="Parse(document.querySelector('textarea').value)">
+        <input type="button" value="Run" id="run" class="top-btn" onclick="compile(document.querySelector('textarea').value)">
     </div>
     <div id="wrap">
-        <textarea id="code" wrap="off" style="width: 97%;">
-        </textarea>
+        <textarea id="code" wrap="off" style="width: 97%;"></textarea>
     </div>
-    <div id="output">
+    <pre id="output">
 
-    </div>
+    </pre>
 </body>
 </html>

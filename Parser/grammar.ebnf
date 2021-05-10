@@ -1,156 +1,224 @@
-# TODO: review full EBNF for any possible logical errors in connections
-# REMEMBER: the language is not type-based, meaning variable type should be determined only at runtime,
-#           which means function call values should be determined at runtime also
+(* +-------------+----------------------------+-------------------------------------------------------+
+ * | Symbol      | Alias name                 | Use                                                   |
+ * +-------------+----------------------------+-------------------------------------------------------+
+ * | ε           | lowercase letter 'epsilon' | Denotes an empty string.                              |
+ * | [ ... ]     |                            | Denotes a structure that can occur 0 or 1 times.      |
+ * | { ... }     |                            | Denotes a structure that can occur 1 or more times.   |
+ * | ' ... '     |                            | Denotes a token whose value is the one mentioned.     |
+ * | '< ... >'   |                            | Denotes a token whose type is the one mentioned.      |
+ * | @ ...       |                            | Denotes an experimental, yet unimplemented structure. |
+ * | {{ @ }}     |                            | Denotes a terminal with a regex-verifiable structure. |
+ * +-------------+----------------------------+-------------------------------------------------------+
+ *)
 
 Program = StatementList
+        | ε
         ;
 
-StatementList = Statement StatementList # with small changes regarding 'begin' syntax in S-expression
-              | Statement
+StatementList = Statement { Statement }
               ;
 
-Statement = VarDecl
-          | Expr ('#EOL' {{ !if && !while}} | '')
-          ;
+Statement = PrintStatement
+          | ErrorStatement
+          | VariableDeclaration
+          | FunctionDeclaration
+          | IfStatement
+          | WhileStatement
+          | Expression, '<EOL>'
+          ; 
 
-Expr = IfExpr
-     | WhileExpr
-     | VarAssign
-     | BooleanExpr
-     | AddExpr
-     ;
+PrintStatement = 'print', Expression { ',', Expression }, '<EOL>'
+               ;
 
-VarDecl = 'var' Identifier '=' AddExpr # separate cases for VarAssign and the other
-        | 'var' Identifier 
-        ;
+ErrorStatement = 'error' [ Expression ], '<EOL>'
+               ;
 
-VarAssign = Identifier '=' Expr
-          ;
+VariableDeclaration = 'var', VariableSequenceList, '<EOL>'
+                    ;
 
-WhileExpr = 'while' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT'
-          ;
+VariableSequenceList = VariableSequence { ',', VariableSequence }
+                     ;
 
-IfExpr = 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' IfExpr 
-       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' WhileExpr 
-       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList '#DEDENT' 'else' ':' '#EOL' '#INDENT' StatementList
-       | 'if' BoolExpr ':' '#EOL' '#INDENT' StatementList
-       ;
+VariableSequence = Identifier [ '=', Expression ]
+                 ;
 
-# BooleanExpr = BooleanLiteral 'and' BooleanExpr
-#             | BooleanLiteral
-#             ;
+FunctionDeclaration = 'func', Identifier, '(' [ ParameterSequenceList ], ')', ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>'
+                    ;
 
+ParameterSequenceList = ParameterSequence { ',', ParameterSequence }
+                      | ε
+                      ;
 
-BoolExpr = EqExpr 'or' BoolExpr(!AndExpr)
-         | EqExpr 'and' BoolExpr(!OrExpr)
-         ;
-         
-EqExpr = RelExpr 'is' RelExpr                                                # not matching 4 == 3, 4 == true
-       | RelExpr 'is' 'not' RelExpr # special case: treated as 'is not'
-       | RelExpr
-       ;
+ParameterSequence = [ ':' ], Identifier [ '=', Expression ]
+                  ;
 
-RelExpr = AddExpr '<' AddExpr
-        | AddExpr '>' AddExpr                        
-        | AddExpr '<=' AddExpr
-        | AddExpr '>=' AddExpr
-        | 'not' BoolExpr                        # prove me wrong
-        | ( "true" | "false" | "nothing"??? )
-        ;
-
-AddExpr = MulExpr '+' AddExpr
-        | ( MulExpr '-' MulExpr ) ( ( '+' | '-' ) AddExpr )?
-        | MulExpr
-        ;
-
-MulExpr = UnExpr '*' MulExpr
-        | ( UnExpr '/' UnExpr ) ( ( '*' | '/' ) MulExpr )?
-        | UnExpr
-        ;
-
-UnExpr = '+' PrimaryExpr        # to be done forward
-       | '-' PrimaryExpr
-       | PrimaryExpr
-       ;
-       
-PrimaryExpr = '(' BoolExpr ')' ######## forget right things mentioned: ===> change AddExpr to something superior (ex. BooleanExpression | Expression | Statement | Other...)
-            | Identifier
-            | Number
+IfStatement = 'if', LogicalExpression, ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>' [ 'else' ( ( ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>' ) | IfStatement | WhileStatement ) ]
             ;
+
+WhileStatement = 'while', LogicalExpression, ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>'
+               ;
+
+Expression = VariableAssignment
+           | LogicalExpression
+           ;
+(* NumericExpression
+   PrimaryExpression 
+   @StringExpression
+   @ListExpression
+   @EntityExpression *)
+
+VariableAssignment = Identifier, '=', Expression
+                   ;
+
+(* #LogicalVariableAssignment
+        #NumericVariableAssignment
+        #StringVariableAssignment
+        #ListVariableAssignment
+        #EntityVariableAssignment *)
+
+(* LogicalVariableAssignment = Identifier, '=', LogicalExpression
+                          ;
+
+NumericVariableAssignment = Identifier, '=', NumericExpression
+                          ; *)
+
+LogicalExpression = EqualityExpression, 'and', AndExpression
+                  | EqualityExpression, 'or', OrExpression
+                  | EqualityExpression
+                  ;
+
+AndExpression = EqualityExpression, 'and', AndExpression
+              | EqualityExpression
+              ;
+
+OrExpression = EqualityExpression, 'or', OrExpression
+             | EqualityExpression
+             ;
+
+EqualityExpression = RelationalExpression, 'is', 'not', RelationalExpression
+                   | RelationalExpression, 'is', RelationalExpression
+                   | RelationalExpression 
+                   ;
+
+(* | NumericExpression, 'is' [ 'not' ], NumericExpression
+                   | @StringExpression, 'is' [ 'not' ], StringExpression
+                   | @ListExpression, 'is' [ 'not' ], ListExpression
+                   | @EntityExpression, 'is' [ 'not' ], EntityExpression
+                    *)
+
+RelationalExpression = AdditiveExpression, '<', AdditiveExpression
+                     | AdditiveExpression, '>', AdditiveExpression                        
+                     | AdditiveExpression, '<=', AdditiveExpression
+                     | AdditiveExpression, '>=', AdditiveExpression
+                     | AdditiveExpression
+                     ;
+
+(* @ListExpression, '<', ListExpression
+                     | @ListExpression, '>', ListExpression                        
+                     | @ListExpression, '<=', ListExpression
+                     | @ListExpression, '>=', ListExpression
+                     |  *)
+
+(* Comparing list expressions using <, >, <= and >= may be done by comparing the lengths of the given lists as one would do with two numbers *)
+
+
+(* inside the FunctionCall EBNF, integrate the syntax that uses 'with' to describe the entity that will bind to 'this' inside the function: ex. build house with hammer, bricks, happiness :: Target<=>JS :: const build = givenMethod.bind(house), build(hammer, bricks, happiness) *)
+
+AdditiveExpression = MultiplicativeExpression, '+', AdditiveExpression
+                   | MultiplicativeExpression, '-', MultiplicativeExpression [ ( '+' | '-' ), AdditiveExpression ]
+                   | MultiplicativeExpression
+                   ;
+
+MultiplicativeExpression = UnaryExpression, '*', MultiplicativeExpression
+                         | UnaryExpression, '/', UnaryExpression [ ( '*' | '/' ), MultiplicativeExpression ]
+                         | TypeExpression
+                         ;
+
+TypeExpression = [ 'type', 'of' ], UnaryExpression
+               ;
+                         
+UnaryExpression = '+', PrimaryExpression
+                | '-', PrimaryExpression
+                | 'not', PrimaryExpression
+                | PrimaryExpression
+                ;
+       
+PrimaryExpression = FunctionCall
+                  | Identifier
+                  | Literal
+                  | '(' ( VariableAssignment | Expression ), ')'
+                  ;
+
+FunctionCall = Identifier, '(' [ ArgumentSequenceList ], ')'
+             ;
+
+ArgumentSequenceList = ArgumentSequence { ',', ArgumentSequence }
+                     | ε
+                     ;
+
+ArgumentSequence = [ Identifier, '=' ], Expression
+                 ;
+
+Literal = NumericLiteral
+        | StringLiteral
+        | ReservedLiteral
+        ;
 
 Identifier = {{ @ }}
            ;
 
-# Literal = Number        # \ non-terminal
-#         | String        # |
-#         | Operator      # |
-#         ;               # /
-
-BooleanLiteral = "true"
-               | "false"
-               | "nothing"
-               ;
-               
-Number = {{ @ }}        # terminal
-       ;
-
-String = {{ @ }}
-       ;
-
-Operator = {{ @ }}
-         ;
-
-
-# Unary = '+' Unary
-#       | '-' Unary
-#       | PrimaryExpr
-#       ;
-
-
-## {{ @ }} refers to specific regex-similar implementation + recognition, which can be found & is done directly in the Tokenizer
-
-
-
-
-AddExpr = MulExpr "+" AddExpr
-        | MulExpr "-" AddExpr
-        | MulExpr
-        ;
-
-MulExpr = UnExpr "*" MulExpr
-        | UnExpr "/" MulExpr
-        | UnExpr
-        ;
-
-UnExpr = "+" PrimExpr
-       | "-" PrimExpr
-       | "!" PrimExpr
-       | PrimExpr
-       ;
-
-PrimaryExpr = "(" Expr ")"
-            | FunctionCall
-            | Identifier
-            | Literal  
-            ;
-
-FunctionCall = Identifier "(" (BoolExpr ("," BoolExpr)*)* ")"
-
-Literal = NumberLiteral
-        | StringLiteral
-        | BooleanLiteral
-        | NothingLiteral
-        ;
-
-Number = {{ @ }}        # terminal
-       ;
-
-String = {{ @ }}
-       ;
-
-BooleanLiteral = "true"
-               | "false"
+NumericLiteral = {{ @ }}
                ;
 
-NothingLiteral = "nothing"
-               ;
+StringLiteral = {{ @ }}
+              ;
+
+ReservedLiteral = {{ @ }}
+                ;
+(* 
+@StringExpression = StringAdditiveExpression
+                  ;
+
+@StringAdditiveExpression = StringMultiplicativeExpression, '+', StringAdditiveExpression
+                          | StringMultiplicativeExpression
+                          ;
+
+@StringMultiplicativeExpression = @StringPrimaryExpression, '*', NumericExpression
+                                | StringPrimaryExpression
+                                ;
+@StringPrimaryExpression = FunctionCall
+                         | Identifier
+                         | '(' ( VariableAssignment | StringExpression ), ')'
+                         | StringLiteral
+                         ; 
+
+@StringLiteral = {{ @ }};
+
+@EntityExpression = EntityPrimaryExpression
+                  ;
+                  
+@EntityPrimaryExpression = FunctionCall
+                         | Identifier
+                         | '(' ( VariableAssignment | EntityExpression ), ')'
+                         | 'nothing'
+                         ;  *)
+
+(* {{ @ }} refers to specific regex-similar implementation + recognition, which can be found & is done directly in the Tokenizer *)
+(* add small if/for syntax:
+        SmallIfExpression  = Expression 'if' LogicalExpression [',' 'otherwise' Expression]
+        SmallForExpression = Expression 'for' 'each' Identifier 'in/of' ListExpression
+        ^^^^^                                                   ^^^^^^
+        Will return a PendingList                               choose by taste
+        object to the Generator,
+        much like ... in JS could
+        possibly function
+
+        if the pending list is not
+        'eaten' by a list as a so called
+        'list element', an error will be thrown
+
+        or
+
+        SmallForExpression could be met ONLY as a ListElement in the parser
+        ListLiteral = '[' [ (Expression | SmallIf | SmallFor) {',', (Expression | SmallIf | SmallFor) } ] ']'
+*)
