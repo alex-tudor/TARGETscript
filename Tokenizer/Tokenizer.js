@@ -79,7 +79,7 @@ class Tokenizer {
                 return op !== undefined && input.substring(this.pos, this.pos + 7) !== "nothing"; // rule for excluding "not" from operator category if it is just part of "nothing" word
             },
             get atIdentStart() {
-                return /^[A-Za-z_]$/.test(this.char);
+                return /^[A-Za-z_`]$/.test(this.char);
             },
             get atPunctStart() {
                 return /^(\:|\[|\]|\^)$/.test(this.char);
@@ -205,11 +205,12 @@ class Tokenizer {
             if (cursor.atStrStart) {
                 // only \ or " can ever be escaped in a string
                 let token = ``,
-                    opened = true,
                     closed = false,
                     isEscaped = false;
-                while (true) {
-                    if (this.isEOF) ErrorHandler.SyntaxError(`String delimiter missing - (${this.line}:${this.column})`);
+                    token += "\"";
+                    cursor.advance();
+                while (!closed) {
+                    if (cursor.atEOF) ErrorHandler.SyntaxError(`Delimiter \" missing at the end of string - (${this.line}:${this.column})`);
 
                     // cursor.prev === '\\', cursor.char === `\\` or `"`
                     if (isEscaped) {
@@ -224,14 +225,8 @@ class Tokenizer {
                     if (cursor.atEscape) {
                         isEscaped = true;
                         cursor.advance();
-                        continue;
-                    }
-
-                    // string === ``, char === `"`
-                    if (opened) {
-                        opened = false;
-                        token += cursor.char;
-                        cursor.advance();
+                        // here should be added a switch for characters like \n, \t, special characters (\xxxx, without that 'u' in front, x = hex digit) etc.
+                        // it should also contain token += cursor.char & cursor.advance()
                         continue;
                     }
 
@@ -239,7 +234,7 @@ class Tokenizer {
                         closed = true;
                         token += cursor.char;
                         cursor.advance();
-                        break;
+                        continue;
                     }
 
                     token += cursor.char;
@@ -285,6 +280,39 @@ class Tokenizer {
 
             if (cursor.atIdentStart) {
                 let token = ``;
+                if(cursor.char === "`") {
+                    token += cursor.char;
+                    cursor.advance();
+                    let closed = false;
+                    while(!closed) {
+                        if (cursor.atEOF || cursor.atEOL) ErrorHandler.SyntaxError(`Delimiter \` missing at the end of spaced identifier - (${this.line}:${this.column})`);
+                        
+                        if (cursor.char === `\``) {
+                            closed = true;
+                            token += cursor.char;
+                            cursor.advance();
+                            continue;
+                        }
+
+                        if(!/^[A-Za-z0-9 ]$/.test(cursor.char))
+                            ErrorHandler.SyntaxError(
+                                `Invalid character found inside spaced identifier: ${cursor.char}. Only alphanumeric characters, spaces and underlines are accepted inside a spaced identifier.`)
+
+                        token += cursor.char;
+                        cursor.advance();
+
+                        // DEBATE: should escaped ` (like \`) be accepted inside identifiers? for the moment, they aren't.
+                    }
+                    if(/^``$/.test(token)) ErrorHandler.SyntaxError(`Spaced identifiers without characters are not allowed.`)
+                    
+                    if(/^`\s+`$/.test(token)) ErrorHandler.SyntaxError(`Spaced identifiers that contain only spaces are not allowed.`)
+
+                    // TODO: DEBATE: should the following happen? (to avoid 2 vs 1-spaced identifier incompatibility problem)
+                    // token = token.replace(/\s+/g, ' ');
+
+                    API.store({ value: token, kind: "identifier", line: cursor.line, column: cursor.column });
+                    continue;
+                }
                 while (true) {
                     if (cursor.atEOF || !API.isIdentifier(token + cursor.char)) break;
                     token += cursor.char;

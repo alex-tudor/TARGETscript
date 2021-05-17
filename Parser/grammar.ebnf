@@ -1,4 +1,5 @@
-(* +-------------+----------------------------+-------------------------------------------------------+
+(* 
+ * +-------------+----------------------------+-------------------------------------------------------+
  * | Symbol      | Alias name                 | Use                                                   |
  * +-------------+----------------------------+-------------------------------------------------------+
  * | ε           | lowercase letter 'epsilon' | Denotes an empty string.                              |
@@ -82,22 +83,17 @@ VariableAssignment = Identifier, '=', Expression
 NumericVariableAssignment = Identifier, '=', NumericExpression
                           ; *)
 
-LogicalExpression = EqualityExpression, 'and', AndExpression
-                  | EqualityExpression, 'or', OrExpression
-                  | EqualityExpression
+LogicalExpression = EqualityExpression [ ( 'and', AndExpression ) | ( 'or', OrExpression ) ]
                   ;
 
-AndExpression = EqualityExpression, 'and', AndExpression
-              | EqualityExpression
+AndExpression = EqualityExpression [ 'and', AndExpression ]
               ;
 
 OrExpression = EqualityExpression, 'or', OrExpression
              | EqualityExpression
              ;
 
-EqualityExpression = RelationalExpression, 'is', 'not', RelationalExpression
-                   | RelationalExpression, 'is', RelationalExpression
-                   | RelationalExpression 
+EqualityExpression = RelationalExpression [ 'is' [ 'not' ], RelationalExpression ]
                    ;
 
 (* | NumericExpression, 'is' [ 'not' ], NumericExpression
@@ -106,11 +102,7 @@ EqualityExpression = RelationalExpression, 'is', 'not', RelationalExpression
                    | @EntityExpression, 'is' [ 'not' ], EntityExpression
                     *)
 
-RelationalExpression = AdditiveExpression, '<', AdditiveExpression
-                     | AdditiveExpression, '>', AdditiveExpression                        
-                     | AdditiveExpression, '<=', AdditiveExpression
-                     | AdditiveExpression, '>=', AdditiveExpression
-                     | AdditiveExpression
+RelationalExpression = AdditiveExpression, [ ( '<' | '>' | '<=' | '>=' ), AdditiveExpression ]
                      ;
 
 (* @ListExpression, '<', ListExpression
@@ -122,35 +114,47 @@ RelationalExpression = AdditiveExpression, '<', AdditiveExpression
 (* Comparing list expressions using <, >, <= and >= may be done by comparing the lengths of the given lists as one would do with two numbers *)
 
 
-(* inside the FunctionCall EBNF, integrate the syntax that uses 'with' to describe the entity that will bind to 'this' inside the function: ex. build house with hammer, bricks, happiness :: Target<=>JS :: const build = givenMethod.bind(house), build(hammer, bricks, happiness) *)
+(* TODO: inside the FunctionCall EBNF, integrate the syntax that uses
+   'with' to describe the entity that will bind to 'this' inside the function:
+   
+   Target ->. build house with hammer, bricks, happiness
+   /\
+   ||
+   \/
+   JS -> const build = givenMethod.bind(house); build(hammer, bricks, happiness)
+*)
 
-AdditiveExpression = MultiplicativeExpression, '+', AdditiveExpression
-                   | MultiplicativeExpression, '-', MultiplicativeExpression [ ( '+' | '-' ), AdditiveExpression ]
-                   | MultiplicativeExpression
+AdditiveExpression = MultiplicativeExpression [ ( '+', AdditiveExpression ) | ( '-', MultiplicativeExpression [ ( '+' | '-' ), AdditiveExpression ] ) ]
                    ;
 
-MultiplicativeExpression = UnaryExpression, '*', MultiplicativeExpression
-                         | UnaryExpression, '/', UnaryExpression [ ( '*' | '/' ), MultiplicativeExpression ]
-                         | TypeExpression
+MultiplicativeExpression = TypeExpression [ ( '*', MultiplicativeExpression ) | ( '/', UnaryExpression [ ( '*' | '/' ), MultiplicativeExpression ] ) ]
                          ;
 
 TypeExpression = [ 'type', 'of' ], UnaryExpression
                ;
                          
-UnaryExpression = '+', PrimaryExpression
-                | '-', PrimaryExpression
-                | 'not', PrimaryExpression
-                | PrimaryExpression
+UnaryExpression = ['+' | '-' | 'not'] PrimaryExpression
                 ;
        
-PrimaryExpression = FunctionCall
+PrimaryExpression = Literal
+                  | FunctionCall
                   | Identifier
-                  | Literal
                   | '(' ( VariableAssignment | Expression ), ')'
                   ;
 
 FunctionCall = Identifier, '(' [ ArgumentSequenceList ], ')'
              ;
+
+(* 
+in a future version: 
+        
+@ArrowFunction = ParameterSequence { ',', ParameterSequence } '=>' Expression 
+@FunctionCall  = ( Identifier | @ArrowFunction ), '(' [ ArgumentSequenceList ], ')'
+
+arrow functions will force 1 parameter because of not having unnecesarry parantheses in syntax
+docs will say it is a standard to use _ as the useless parameter
+
+*)
 
 ArgumentSequenceList = ArgumentSequence { ',', ArgumentSequence }
                      | ε
@@ -159,13 +163,13 @@ ArgumentSequenceList = ArgumentSequence { ',', ArgumentSequence }
 ArgumentSequence = [ Identifier, '=' ], Expression
                  ;
 
+Identifier = {{ @ }}
+           ;
+
 Literal = NumericLiteral
         | StringLiteral
         | ReservedLiteral
         ;
-
-Identifier = {{ @ }}
-           ;
 
 NumericLiteral = {{ @ }}
                ;
@@ -204,7 +208,9 @@ ReservedLiteral = {{ @ }}
                          ;  *)
 
 (* {{ @ }} refers to specific regex-similar implementation + recognition, which can be found & is done directly in the Tokenizer *)
-(* add small if/for syntax:
+(* TODO: 
+
+        add small if/for syntax:
         SmallIfExpression  = Expression 'if' LogicalExpression [',' 'otherwise' Expression]
         SmallForExpression = Expression 'for' 'each' Identifier 'in/of' ListExpression
         ^^^^^                                                   ^^^^^^

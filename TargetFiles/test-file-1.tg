@@ -1,0 +1,24 @@
+func `if`(condition, :consequence, :alternative):
+    if condition is true:
+        print consequence
+    else:
+        print alternative
+
+func `say`(:`greeting text`, message, :`welcome` = false):
+    if `greeting text` is not nothing:
+        print `greeting text`
+
+    if welcome is true:
+        print "Welcome!"
+
+    else:
+        print `message`
+
+say("I love Target!", `welcome` = true, `greeting text` = "Hi everybody!")
+
+var `my variable` = 30, myOtherVariable = 12, `lucky day` = true
+
+`if`(`lucky day`, "This is the lucky day!", "Wait another day!")
+
+print true, false, nothing, 42, 3.14, "Target", `my variable`, myOtherVariable
+error "This is a user-generated program error."

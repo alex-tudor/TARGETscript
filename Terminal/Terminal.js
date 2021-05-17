@@ -28,14 +28,20 @@
 // Tokenize = code => new Tokenizer().tokenize(code);
 // Parse    = code => new Parser().parse(new Tokenizer().tokenize(code));
 
-compile  = code => new Generator().generate(new Parser().parse(new Tokenizer().tokenize(code)));
+compile = code => new Generator().generate(new Parser().parse(new Tokenizer().tokenize(code)));
 
 const start = performance.now();
-fetch('./TargetFiles/test-file.tg')
-    .then(response => response.text())
-    .then(compile)
-    .catch(console.warn)
-    .finally(() => (console.log('%c' + (performance.now() - start), 'background: lightgreen; color: darkgreen; padding: 8px'), null))
+
+process = filename => typeof filename === "string"
+    ? fetch(filename).then(response => response.text())
+        .then(compile)
+        .catch(console.warn)
+        .finally(() => (console.log(`Program performance: ${performance.now() - start}ms.`, null)))
+    : `Filename given is not a string.`;
+
+    for(let i = 1; i <= 1; i++) {
+        process(`./TargetFiles/test-file-${i}.tg`);
+    }
 // community / group Apples:
     // var color = "red"
     // var size = 10.234

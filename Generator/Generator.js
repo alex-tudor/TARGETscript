@@ -2,14 +2,18 @@
 // change typeofs into custom type() function (because expressions could be identifiers / function calls)
 // create ErrorStmt and PrintStmt
 
+// REPAIR: repair Generator in the case of `` identifiers
+// DEBATE: prohibit or not function redeclaration in the same env (will it create problems with overriding / overloading?)
+//      PRO: technially speaking, ```func name(a, b, c): <code> <=> let name = (a, b, c => <code>)() 
+
+// TODO: fulfill validType questioning inside (each global function -print -error) given below
 class Generator {
     constructor() {
         this.global = new Environment({
             'nothing': null,
             'true': true,
             'false': false,
-            // 'print': (...args) => (args.length && console.log(args.join(' ')), 'nothing'),
-            'print': (...args) => (args.length && console.log(args.map(arg => (arg === null && 'nothing') || (arg === true && 'true') || (arg === false && 'false') || arg).join(' ')), 'nothing'),
+            'print': (...args) => (args.length && console.log(args), console.log(args.map(arg => (arg === null && 'nothing') || arg).join(' ')), 'nothing'), // <= TODO: IF POSSIBLE, FIXME: all args received are JS values and are written in white in console (instead of their own JS-type-based colours) because of the internal call of toString() when join() is applied
             'error': message => (typeof message === "undefined" ? ErrorHandler.Error('An error occured.') : ErrorHandler.Error((message === null && 'nothing') || (message === true && 'true') || (message === false && 'false') || message), 'nothing'),
             'and': (first, second) => {
                 if (typeof first === "boolean" && typeof second === "boolean") return first && second;
@@ -20,19 +24,42 @@ class Generator {
 
             },
             'is': (first, second) => {
-                if (typeof first === "boolean" && typeof second === "boolean") return first === second; // we stop type coercion of boolean to number. Instead, we do number to boolean
-                if (typeof first === "number" && typeof second === "number") return first === second;
-                // TODO: add comparation between strings using a custom type() function
+                console.log(first, second, '!!!!!!!!!!!!!!!!!!!!')
+                const validTypes = [
+                    ['logical', 'logical'],
+                    ['logical', 'nothing'],
+
+                    ['numeric', 'numeric'],
+                    ['numeric', 'nothing'],
+
+                    ['text', 'text'],
+                    ['text', 'nothing'],
+
+                    ['nothing', 'logical'],
+                    ['nothing', 'numeric'],
+                    ['nothing', 'text'],
+                    ['nothing', 'nothing']
+                ];
+                if (validTypes.some(arr => arr[0] === this.type(first) && arr[1] === this.type(second)))
+                    return first === second;
+
                 ErrorHandler.RuntimeError("Bad operand types for the 'is' operator.");
             },
             'is not': (first, second) => {
                 const validTypes = [
                     ['logical', 'logical'],
-                    ['numeric', 'numeric'],
                     ['logical', 'nothing'],
-                    ['nothing', 'logical'],
+
+                    ['numeric', 'numeric'],
+                    ['numeric', 'nothing'],
+
+                    ['text', 'text'],
                     ['text', 'nothing'],
-                    ['nothing', 'text']
+
+                    ['nothing', 'logical'],
+                    ['nothing', 'numeric'],
+                    ['nothing', 'text'],
+                    ['nothing', 'nothing']
                 ];
                 if (validTypes.some(arr => arr[0] === this.type(first) && arr[1] === this.type(second)))
                     return first !== second;
@@ -88,16 +115,33 @@ class Generator {
     isVar(expr) {
         return typeof expr === "string" && /^[A-Za-z][A-Za-z0-9]*$/.test(expr);
     }
+    isSpacedVar(expr) {
+        return typeof expr === "string" && /^(?:`[A-Za-z0-9_ ]+`)$/.test(expr); // + in regex may be changed to * if it is decided that empty 'spaced' identifiers (which is kind of a paradox) could exist as a valid component of Target
+    }
+
     type(expr) {
         if (expr === null) return "nothing";
         if (expr === true || expr === false) return "logical";
         if (typeof expr === "number") return "numeric";
         if (typeof expr === "string") return "text";
-        /* CHANGE, REPAIR */ return 'other';
+        if (typeof expr === "object") {
+            if (expr.hasOwnProperty("body")
+                && expr.hasOwnProperty("env")
+                && expr.hasOwnProperty("params")
+                && typeof expr.params === "object"
+                && expr.params.hasOwnProperty("regular")
+               /**/ && expr.params.regular.constructor.name === "Array"
+                && expr.params.hasOwnProperty("named")
+               /**/ && expr.params.named.constructor.name === "Array"
+            ) {
+                return "function";
+            }
+        }
+        /* CHANGE: REPAIR: */ return 'other';
     }
 
     generate(input) {
-        if(typeof input !== "object" || input.constructor.name !== "Array")
+        if (typeof input !== "object" || input.constructor.name !== "Array")
             ErrorHandler.InternalError("Input given to the Generator is not of type 'array'.");
 
         return this.eval(input);
@@ -108,7 +152,7 @@ class Generator {
 
             /**
              * @syntax      [var ...<variables>]
-             * @description Creates one or more variables with the given names and values
+             * @description Creates one or more variables with the given names and values.
              */
             if (expr[0] === "var") {
                 if (Array.isArray(expr[1])) {
@@ -129,7 +173,6 @@ class Generator {
             if (expr[0] === "type") {
                 let [_type, expression] = expr;
                 expression = this.eval(expression, env);
-                console.log(expr, expression);
                 return this.type(expression);
             }
 
@@ -140,11 +183,14 @@ class Generator {
              */
             if (expr[0] === "assign") {
                 if (Array.isArray(expr[1]) && expr[1][0] === "prop") {
-                    const [_assign, [_prop, entity, property], value] = expr,
-                        entityEnv = this.eval(entity, env);
-
-                    // should the below instruction be only entityEnv.assign ?
-                    return entityEnv.define(property, this.eval(value, env)); // will do exactly the same for the cases where the "assign()" method would have been needed
+                    const [_assign, [_prop, entity, property], value] = expr;
+                    const entityEnv = this.eval(entity, env);
+                    // the below instruction works like an assign (TODO: to be changed when introducing constant expressions, introduce constants with try-catch on javascript defineProperty(writable = true))
+                    // assign() is not used because it 'looks' further than the entityEnv if property is not found inside the entityEnv
+                    // TODO: DEBATE: select 1 of 2 options:
+                    // - assign(name, value, TTL), getVarEnv receives TTL, if TTL gets 0, then Error. TTL will be 1 for entityEnv
+                    // - define(name, value) with try-catch on both assignments, will catch variables where writable=true throws error, so that JS will tell you they should be constant
+                    return entityEnv.define(property, this.eval(value, env));
                 } else {
                     const [_assign, name, value] = expr;
                     return env.assign(name, this.eval(value, env));
@@ -161,37 +207,46 @@ class Generator {
             }
 
             /**
-             * @syntax      [arrow <unnamed> <named> (<statement> | [begin ...<body>])]
-             * @description Creates an anonymous function with the given unnamed parameters, named parameters and body
+             * @syntax      [arrow <regular> <named> (<statement> | [begin ...<body>])]
+             * @description Creates an anonymous function with the given regular parameters, named parameters and body
              * TODO: make arrows to be like functions, but without name
              */
             if (expr[0] === "arrow") {
-                       // check for disjunction between params.named & params.unnamed
-        // ex. func say(message, :greeting, message, :message, :welcome):
+                let [_arrow, regular, named, statement] = expr;
 
-                const [_arrow, unnamed, named, statement] = expr;
+                // [ {name: a, value: 1}, {name: b, value: 2} ]
+                // { a: 1, b: 2 }
+
+                // console.log(regular);
+
+                // regular = Object.fromEntries(regular.map(obj => [ obj.name, obj.value ]))
+
+                // console.log(regular);
+
+                // named = Object.fromEntries(Object.entries(named).map(([key, value]) => [/^(?:`[A-Za-z0-9 ]`)$/.test(key) ? key.slice(1, -1) : key, value]))
+
                 if (Array.isArray(statement) && statement[0] === "begin") {
                     const [_begin, ...body] = statement;
                     return {
-                        params: { unnamed, named },
+                        params: { regular, named },
                         body: body,
                         env
                     };
                 }
                 return {
-                    params: { unnamed, named },
+                    params: { regular, named },
                     body: [statement],
                     env
                 };
             }
 
             /**
-             * @syntax      [func <name> <unnamed> <named> (<statement> | [begin ...<body>])]
-             * @description Creates a function with the given name, unnamed parameters, named parameters and body
+             * @syntax      [func <name> <regular> <named> (<statement> | [begin ...<body>])]
+             * @description Creates a function with the given name, regular parameters, named parameters and body
              */
             if (expr[0] === "func") {
-                const [_func, name, unnamed, named, statement] = expr;
-                return env.define(name, this.eval(["arrow", unnamed, named, statement]));
+                const [_func, name, regular, named, statement] = expr;
+                return env.define(name, this.eval(["arrow", regular, named, statement]));
             }
 
             /**
@@ -207,16 +262,17 @@ class Generator {
             }
 
             /**
-             * @syntax      [entity <community> ...<params>]
+             * @syntax      [entity <community> ...<args>]
              * @description Reads a given property from a given object
              */
             if (expr[0] === "entity") {
-                let [_entity, community, params] = expr;
+                // REPAIR: See footnotes given inside this statement block
+                let [_entity, community, args] = expr;
                 const communityEnv = this.eval(community, env);
                 const entityEnv = new Environment({}, communityEnv);
-                if (params) params = params.map(param => this.eval(param, env));
-                else params = [];
-                this.call(communityEnv.get('constructor'), [entityEnv, ...params]);
+                if (args) args = args.map(param => this.eval(param, env));
+                else args = [];
+                this.call(communityEnv.get('constructor'), [entityEnv, ...args]); // CHANGE: REPAIR: entityEnv, given as explicit "this" argument to the constructor function, does not get used, nor implemented as its function tells us that should do
                 return entityEnv;
             }
 
@@ -246,7 +302,7 @@ class Generator {
             if (expr[0] === "if") {
                 const [_if, condition, consequence, alternative] = expr;
                 let cond = this.eval(condition, env);
-                if (cond !== true && cond !== false) ErrorHandler.RuntimeError("Condition given to if statement cannot be computed into { true | false }")
+                if (this.type(cond) !== "logical") ErrorHandler.RuntimeError("Condition given to if statement cannot be computed into { true | false }")
                 if (cond) {
                     if (!Array.isArray(consequence) || consequence[0] !== "begin")
                         return this.eval(consequence, env);
@@ -263,24 +319,27 @@ class Generator {
                 }
                 return null; // <=> this.eval('nothing', env);
             }
+            {
+                /** 
+                 * @syntax      [while <condition> (<consequence> | [begin, ...<body>])]
+                 * @description Executes one of the two branches given depending on the given condition's value of truth
+                 */
+                if (expr[0] === "while") {
+                    const [_while, condition, consequence] = expr;
+                    let lastExpr = null, cond;
+                    // DEBATE: REPAIR: should while return false onerror?
+                    while (this.type(cond = this.eval(condition, env)) === "logical" ? cond : (ErrorHandler.RuntimeError("Condition given to while statement cannot be computed into { true | false }"), false)) {
+                        if (!Array.isArray(consequence) || consequence[0] !== "begin")
+                            lastExpr = this.eval(consequence, env);
 
-            /** 
-             * @syntax      [while <condition> (<consequence> | [begin, ...<body>])]
-             * @description Executes one of the two branches given depending on the given condition's value of truth
-             */
-            if (expr[0] === "while") {
-                const [_while, condition, consequence] = expr;
-                let lastExpr = null, cond;
-                while ((cond = this.eval(condition, env)) === true ? true : (cond === false ? false : (ErrorHandler.RuntimeError("Condition given to while statement cannot be computed into { true | false }"), false))) {
-                    if (!Array.isArray(consequence) || consequence[0] !== "begin")
-                        lastExpr = this.eval(consequence, env);
-
-                    else {
-                        const [_begin, ...body] = consequence;
-                        lastExpr = this.evalMultiple(body, env);
+                        else {
+                            const [_begin, ...body] = consequence;
+                            lastExpr = this.evalMultiple(body, env);
+                        }
                     }
+                    // TODO: REPAIR: DEBATE: should (while && !smallWhile) expressions return any value? I don't think they should.
+                    return lastExpr;
                 }
-                return lastExpr;
             }
             {
                 /** 
@@ -306,7 +365,7 @@ class Generator {
             {
                 /**
                  * @syntax [ <func> ...<args> ]
-                 * @description Calls a built-in & globally-scoped function with given unnamed arguments 
+                 * @description Calls a built-in & globally-scoped function with given regular arguments 
                  */
                 let [func, ...args] = expr;
                 func = this.eval(func, env);
@@ -315,34 +374,40 @@ class Generator {
                     return func(...args);
                 }
             }
-            {
-                /**
-                 * @syntax [ <name> { <unnamed>, <named> } ]
-                 * @description Calls a given user-defined function with given unnamed & named arguments
-                 */
-                let [name, { unnamed = [], named = {} }] = expr;
-                let func = { name, ...this.eval(name, env) };
-                unnamed = unnamed.map(arg => this.eval(arg, env));
-                Object.entries(named).map(([key, value]) => {
-                    named[key] = this.eval(value, env);
-                });
-                console.log(func, { unnamed, named })
-                return this.call(func, { unnamed, named });
+            /**
+             * @syntax [ <name> { <regular>, <named> } ]
+             * @description Calls a given user-defined function with given regular & named arguments
+             */
+            let [name, { regular = [], named = {} }] = expr;
+            let content = this.eval(name, env);
+            if (this.type(content) === "function") {
+                if (this.isSpacedVar(name))
+                    name = name.slice(1, -1);
+                    
+                let func = { name, ...content };
+                regular = regular.map(arg => this.eval(arg, env));
+
+                // modify all `...` keys into ... before starting
+                Object.entries(named).forEach(([key, value]) => { named[key] = this.eval(value, env); });
+                console.log(func, { regular, named })
+                return this.call(func, { regular, named });
             }
+            ErrorHandler.RuntimeError(`The variable \`${name}\` does not represent a function, therefore, it cannot be called.`)
         }
 
         if (this.isNum(expr)) return expr;
         if (this.isStr(expr)) return expr.slice(1, -1);
         if (this.isOp(expr)) return env.get(expr);
         if (this.isVar(expr)) return env.get(expr);
+        if (this.isSpacedVar(expr)) return env.get(expr.slice(1, -1));
 
-        ErrorHandler.SyntaxError(`The token "${expr}" has no functionality associated with it.`)
+        ErrorHandler.RuntimeError(`The token "${expr}" has no functionality associated with it.`)
     }
     evalFuncBody(body, env) {
         let lastExpr = null;
         body.forEach(expr => {
             if (Array.isArray(expr) && ['community', 'begin'].includes(expr[0]))
-                ErrorHandler.SyntaxError(`Expected { literal | var | assign | func | entity | prop | method_call } expression - Found ${expr[0]}`);
+                ErrorHandler.RuntimeError(`Expected { literal | var | assign | func | entity | prop | method_call } expression - Found ${expr[0]}`);
 
             lastExpr = this.eval(expr, env);
         })
@@ -352,7 +417,7 @@ class Generator {
         let lastExpr = null;
         body.forEach(expr => {
             if (!Array.isArray(expr) || !['var', 'func'].includes(expr[0]))
-                ErrorHandler.SyntaxError(`Expected { var | func } expression - Found ${Array.isArray(expr) ? expr[0] : expr}`);
+                ErrorHandler.RuntimeError(`Expected { var | func } expression - Found ${Array.isArray(expr) ? expr[0] : expr}`);
 
             lastExpr = this.eval(expr, env);
         })
@@ -367,13 +432,13 @@ class Generator {
     }
     call(func, args) {
         let activationRecord = {}, paramNames, undefinedArgs;
-        // DEBATE: too few unnamed arguments error should / should not exist (arguments for 'should not': overloading in JS is only possible using parameter number, named arguments would differ when using different overloaded functions, which creates confusion)
+        // DEBATE: too few regular arguments error should / should not exist (arguments for 'should not': overloading in JS is only possible using parameter number, named arguments would differ when using different overloaded functions, which creates confusion)
 
-        // if (args.unnamed.length < func.params.unnamed.length)
-        //     ErrorHandler.RuntimeError(`Too few unnamed arguments given when calling the function '${func.name}'.`);
+        // if (args.regular.length < func.params.regular.length)
+        //     ErrorHandler.RuntimeError(`Too few regular arguments given when calling the function '${func.name}'.`);
 
-        if (args.unnamed.length > func.params.unnamed.length)
-            ErrorHandler.RuntimeError(`Too many unnamed arguments given when calling the function '${func.name}'.`);
+        if (args.regular.length > func.params.regular.length)
+            ErrorHandler.RuntimeError(`Too many regular arguments given when calling the function '${func.name}'.`);
 
         paramNames = func.params.named.map(param => param.name);
         undefinedArgs = Object.keys(args.named).filter(key => !paramNames.includes(key));
@@ -382,13 +447,12 @@ class Generator {
             ErrorHandler.RuntimeError(`The named argument '${undefinedArgs[0]}' is not declared as a named parameter inside the function '${func.name}'.`)
 
         if (undefinedArgs.length > 1)
-            ErrorHandler.RuntimeError(`The named arguments '${undefinedArgs.toString().split(',').join(', ')}' are not declared as named parameters inside the function '${func.name}'.`)
+            ErrorHandler.RuntimeError(`The named arguments '${undefinedArgs.join(', ')}' are not declared as named parameters inside the function '${func.name}'.`)
 
         // check for duplicate name of named argument appearing in call:
         // ex. say("Hi", welcome = true, greeting = false, welcome = false) 
-
-        func.params.unnamed.forEach((param, index) => { activationRecord[param.name] = args.unnamed[index] ?? param.value }); // param.value = the default value of the parameter
-        func.params.named.forEach(param => { activationRecord[param.name] = args.named[param.name] ?? param.value });
+        func.params.regular.forEach((param, index) => { activationRecord[param.name] = args.regular[index] === undefined ? args.regular[index] : param.value }); // param.value = the default value of the parameter
+        func.params.named.forEach(param => { activationRecord[param.name] = args.named[param.name] === undefined ? args.named[param.name] : param.value });
 
         const activationEnv = new Environment(activationRecord, func.env);
         return this.evalFuncBody(func.body, activationEnv);
