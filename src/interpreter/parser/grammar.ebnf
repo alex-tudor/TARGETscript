@@ -1,0 +1,246 @@
+(* 
+ * +-------------+----------------------------+-------------------------------------------------------+
+ * | Symbol      | Alias name                 | Use                                                   |
+ * +-------------+----------------------------+-------------------------------------------------------+
+ * | ε           | lowercase letter 'epsilon' | Denotes an empty string.                              |
+ * | [ ... ]     |                            | Denotes a structure that can occur 0 or 1 times.      |
+ * | { ... }     |                            | Denotes a structure that can occur 1 or more times.   |
+ * | ' ... '     |                            | Denotes a token whose value is the one mentioned.     |
+ * | '< ... >'   |                            | Denotes a token whose type is the one mentioned.      |
+ * | @ ...       |                            | Denotes an experimental, yet unimplemented structure. |
+ * | {{ @ }}     |                            | Denotes a terminal with a regex-verifiable structure. |
+ * +-------------+----------------------------+-------------------------------------------------------+
+ *)
+
+Program = StatementList
+        | ε
+        ;
+
+StatementList = Statement { Statement }
+              ;
+
+Statement = PrintStatement
+          | ErrorStatement
+          | UseStatement
+          | ExportStatement
+          | ConstantDeclaration
+          | VariableDeclaration
+          | FunctionDeclaration
+          | IfStatement
+          | WhileStatement
+          | Expression, '<EOL>'
+          ; 
+
+PrintStatement = 'print', Expression { ',', Expression }, '<EOL>'
+               ;
+
+ErrorStatement = 'error' [ Expression ], '<EOL>'
+               ;
+
+UseStatement = 'use', Identifier { ',', Identifier }, 'from', StringLiteral, '<EOL>'
+             ;
+
+ExportStatement = 'export', Identifier { ',', Identifier }, '<EOL>'
+                ;
+
+ConstantDeclaration = 'const', ConstantSequenceList, '<EOL>'
+                    ;
+
+ConstantSequenceList = ConstantSequence { ',', ConstantSequence }
+                     ;
+
+ConstantSequence =  Identifier, '=', Expression
+                 ;
+
+VariableDeclaration = 'var', VariableSequenceList, '<EOL>'
+                    ;
+
+VariableSequenceList = VariableSequence { ',', VariableSequence }
+                     ;
+
+VariableSequence = Identifier [ '=', Expression ]
+                 ;
+
+FunctionDeclaration = 'func', Identifier, '(' [ ParameterSequenceList ], ')', ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>'
+                    ;
+
+ParameterSequenceList = ParameterSequence { ',', ParameterSequence }
+                      | ε
+                      ;
+
+ParameterSequence = [ ':' ], Identifier [ '=', Expression ]
+                  ;
+
+IfStatement = 'if', LogicalExpression, ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>' [ 'else' ( ( ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>' ) | IfStatement | WhileStatement ) ]
+            ;
+
+WhileStatement = 'while', LogicalExpression, ':', '<EOL>', '<INDENT>', StatementList, '<DEDENT>'
+               ;
+
+Expression = VariableAssignment
+           | LogicalExpression
+           ;
+(* @StringExpression
+   @ListExpression
+   @EntityExpression *)
+
+VariableAssignment = Identifier, '=', Expression
+                   ;
+
+(* #LogicalVariableAssignment
+        #NumericVariableAssignment
+        #StringVariableAssignment
+        #ListVariableAssignment
+        #EntityVariableAssignment *)
+
+(* LogicalVariableAssignment = Identifier, '=', LogicalExpression
+                          ;
+
+NumericVariableAssignment = Identifier, '=', NumericExpression
+                          ; *)
+
+LogicalExpression = EqualityExpression [ ( 'and', AndExpression ) | ( 'or', OrExpression ) ]
+                  ;
+
+AndExpression = EqualityExpression [ 'and', AndExpression ]
+              ;
+
+OrExpression = EqualityExpression, 'or', OrExpression
+             | EqualityExpression
+             ;
+
+EqualityExpression = RelationalExpression [ 'is' [ 'not' ], RelationalExpression ]
+                   ;
+
+(* | NumericExpression, 'is' [ 'not' ], NumericExpression
+                   | @StringExpression, 'is' [ 'not' ], StringExpression
+                   | @ListExpression, 'is' [ 'not' ], ListExpression
+                   | @EntityExpression, 'is' [ 'not' ], EntityExpression
+                    *)
+
+RelationalExpression = AdditiveExpression, [ ( '<' | '>' | '<=' | '>=' ), AdditiveExpression ]
+                     ;
+
+(* @ListExpression, '<', ListExpression
+                     | @ListExpression, '>', ListExpression                        
+                     | @ListExpression, '<=', ListExpression
+                     | @ListExpression, '>=', ListExpression
+                     |  *)
+
+(* Comparing list expressions using <, >, <= and >= may be done by comparing the lengths of the given lists as one would do with two numbers *)
+
+
+(* TODO: inside the FunctionCall EBNF, integrate the syntax that uses
+   'with' to describe the entity that will bind to 'this' inside the function:
+   
+   Target ->. build house with hammer, bricks, happiness
+   /\
+   ||
+   \/
+   JS -> const build = givenMethod.bind(house); build(hammer, bricks, happiness)
+*)
+
+AdditiveExpression = MultiplicativeExpression [ ( '+', AdditiveExpression ) | ( '-', MultiplicativeExpression [ ( '+' | '-' ), AdditiveExpression ] ) ]
+                   ;
+
+MultiplicativeExpression = TypeExpression [ ( '*', MultiplicativeExpression ) | ( '/', UnaryExpression [ ( '*' | '/' ), MultiplicativeExpression ] ) ]
+                         ;
+
+TypeExpression = [ 'type', 'of' ], UnaryExpression
+               ;
+                         
+UnaryExpression = ['+' | '-' | 'not'] PrimaryExpression
+                ;
+       
+PrimaryExpression = Literal
+                  | FunctionCall
+                  | Identifier
+                  | '(' ( VariableAssignment | Expression ), ')'
+                  ;
+
+FunctionCall = Identifier, '(' [ ArgumentSequenceList ], ')'
+             ;
+
+(* 
+in a future version: 
+        
+@ArrowFunction = ParameterSequence { ',', ParameterSequence } '=>' Expression 
+@FunctionCall  = ( Identifier | @ArrowFunction ), '(' [ ArgumentSequenceList ], ')'
+
+arrow functions will force 1 parameter because of not having unnecesarry parantheses in syntax
+docs will say it is a standard to use _ as the useless parameter
+
+*)
+
+ArgumentSequenceList = ArgumentSequence { ',', ArgumentSequence }
+                     | ε
+                     ;
+
+ArgumentSequence = [ Identifier, '=' ], Expression
+                 ;
+
+Identifier = {{ @ }}
+           ;
+
+Literal = NumericLiteral
+        | StringLiteral
+        | ReservedLiteral
+        ;
+
+NumericLiteral = {{ @ }}
+               ;
+
+StringLiteral = {{ @ }}
+              ;
+
+ReservedLiteral = {{ @ }}
+                ;
+(* 
+@StringExpression = StringAdditiveExpression
+                  ;
+
+@StringAdditiveExpression = StringMultiplicativeExpression, '+', StringAdditiveExpression
+                          | StringMultiplicativeExpression
+                          ;
+
+@StringMultiplicativeExpression = @StringPrimaryExpression, '*', NumericExpression
+                                | StringPrimaryExpression
+                                ;
+@StringPrimaryExpression = FunctionCall
+                         | Identifier
+                         | '(' ( VariableAssignment | StringExpression ), ')'
+                         | StringLiteral
+                         ; 
+
+@StringLiteral = {{ @ }};
+
+@EntityExpression = EntityPrimaryExpression
+                  ;
+                  
+@EntityPrimaryExpression = FunctionCall
+                         | Identifier
+                         | '(' ( VariableAssignment | EntityExpression ), ')'
+                         | 'nothing'
+                         ;  *)
+
+(* {{ @ }} refers to specific regex-similar implementation + recognition, which can be found & is done directly in the Tokenizer *)
+(* TODO: 
+
+        add small if/for syntax:
+        SmallIfExpression  = Expression 'if' LogicalExpression [',' 'otherwise' Expression]
+        SmallForExpression = Expression 'for' 'each' Identifier 'in/of' ListExpression
+        ^^^^^                                                   ^^^^^^
+        Will return a PendingList                               choose by taste
+        object to the Generator,
+        much like ... in JS could
+        possibly function
+
+        if the pending list is not
+        'eaten' by a list as a so called
+        'list element', an error will be thrown
+
+        or
+
+        SmallForExpression could be met ONLY as a ListElement in the parser
+        ListLiteral = '[' [ (Expression | SmallIf | SmallFor) {',', (Expression | SmallIf | SmallFor) } ] ']'
+*)
