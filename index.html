@@ -1,0 +1,439 @@
+<!--
+    TODO:
+        - make the side menu rectactable:
+            * toggle >> with <<
+            * make menu 1 column instead of 2, when small
+            * play with grid properties to arrange all tiles in first-to-last order
+            * in small menu, << becomes a "tile" on its own, only user image profile becomes visible from the 2-colspan-ed user button
+            * ?? make the menu appear from the 2nd slide to the bottom (fade out on first slide, because an horizontal menu will be already there)
+            - find better backgrounds & Font-Awesome icons
+        - reproduce the Stella menu for the docs (with magnifier & camera effects)
+        - find main backgrounds for the middle of the description pages, as the milkshake can in the resource #001
+        - ?? if possible, see if bottom menu in #001 can be used somehow in any of the pages (maybe as he 1st page's horizontal menu, with a fadeOut on scroll?)
+        - ?? consider creating a dark-mode for the page & maybe also use the dark-mode selector in CSS to find out if current device's preferences regarding dark-mode (has it on || off)
+-->
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Target | Welcome to Target! </title>
+    <style>
+
+        /*
+        TODO: if considered necessary (between specific side menu tiles):
+
+        .menu-separator {
+            [ border-bottom + translateY(-50%) ] OR [ height + background-color ],
+            [ width: 100% ]
+            [ equal, positive & with percent unit left-right margins ] (to make it smaller, but keep scale),
+            [ negative, equal & with (r)em unit top-down margins ] (to have the separation line closer to the tiles)
+        }
+        */
+
+        * {
+            box-sizing: border-box;
+        }
+
+        .page-carousel {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+        }
+
+        .page-carousel::-webkit-scrollbar {
+            display: none;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .page-carousel {
+            overflow-y: scroll;
+            max-height: 100vh;
+        }
+
+        .page-carousel>.page {
+            scroll-snap-align: start;
+            height: 100vh;
+        }
+
+        .page-carousel>.page>.blur {
+            background: rgba(255, 255, 255, 0.2);
+            height: 100%;
+            width: 100%;
+            padding: 10em;
+        }
+
+        .blur {
+            background: linear-gradient(to bottom, #fffe, #8887);
+            z-index: 2;
+            margin: 4em;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: calc(100% - 8em);
+            height: calc(100% - 8em);
+            border-radius: .5em;
+            padding: 0;
+        }
+
+        .app>.page-carousel>.page>.content {
+            z-index: 3;
+            background: #f003;
+            margin: 4rem;
+            width: calc(100% - 14rem);
+            height: calc(100% - 8rem);
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+            opacity: 0;
+            transition: opacity 2s, width 1s;
+            font-size: 72px;
+        }
+
+        .page {
+            display: flex;
+        }
+
+        .blur>.side-menu {
+            position: absolute;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            flex-direction: column;
+            right: 0;
+            width: 6em;
+            height: 100%;
+            padding: .75em 1.5em;
+            /* padding top-down-left-right = (side menu width - tile width) / 2 */
+            border-top-right-radius: .5em;
+            border-bottom-right-radius: .5em;
+            background: linear-gradient(to bottom, #fff8, #8884);
+            transition: all 1s;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .blur>.side-menu::-webkit-scrollbar {
+            display: none;
+        }
+
+        .blur>.side-menu.opened {
+            width: 10em;
+        }
+
+        .company-logo {
+            width: 3em;
+            height: 3em;
+            margin: 0.5em 0;
+            transition: all 1s;
+        }
+
+        .company-logo img {
+            width: 100%;
+            height: 100%;
+            border-radius: 1em;
+        }
+
+        .blur>.side-menu.opened>.company-logo {
+            width: 7em;
+            height: 7em;
+        }
+
+        .expand,
+        .tile {
+            width: 0;
+            height: 0;
+            padding: 1.5em;
+            position: relative;
+            top: 0;
+            left: 0;
+            border-radius: 1em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #0001;
+            margin: 0.5em 0;
+            /* transition: background-color 1s; */
+            cursor: pointer;
+            color: navy;
+            transition: all 1s;
+        }
+
+        .blur>.side-menu>.expand>div {
+            transition: transform 1s;
+        }
+
+        .blur>.side-menu.opened>.expand>div {
+            transform: rotateY(180deg)
+        }
+
+        .blur>.side-menu.opened .tile {
+            top: -4em;
+            /* margin-bottom = -1 * (tile margin-top in closed menu + tile height) */
+        }
+
+        .blur>.side-menu.opened .tile:nth-child(even) {
+            margin-bottom: -3.5em;
+            /* margin-bottom = -1 * (tile margin-top in closed menu + tile height) */
+        }
+
+        .blur>.side-menu.opened .tile:nth-child(odd) {
+            left: 4em;
+            /* left = opened menu width - 2 * left-right padding - tile width */
+        }
+
+        .tile>a {
+            display: block;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 1em;
+        }
+
+        .user-logo {
+            grid-column: 1 / -1;
+            /* -1 = last column line */
+            width: 100%;
+            height: 0;
+            padding: 1.5em;
+            border-radius: 1em;
+            background: navy;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            border-radius: 1em;
+            overflow: hidden;
+            color: white;
+        }
+
+        .user-logo>* {
+            position: relative;
+            left: -1.5em;
+        }
+
+        .user-logo>.only-visible {
+            position: relative;
+            left: -1.5em;
+            width: 0;
+            height: 0;
+            padding: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tile:hover {
+            background-color: #fff;
+        }
+
+
+        /* optional background-colors for the page elements in website */
+        
+        .page-carousel .page:first-child {
+            background: linear-gradient(to bottom, rgb(255, 202, 57), rgb(220, 130, 238), rgb(48, 85, 206), rgb(31, 48, 126));
+            /* background-image: url('./images/sergei-akulich--heLWtuAN3c-unsplash.jpg'); */
+            background-size: cover;
+        }
+
+        .page-carousel .page:nth-child(2) {
+            background: blue;
+        }
+
+        .page-carousel .page:nth-child(4) {
+            background: orange;
+        }
+
+        .page-carousel .page:nth-child(5) {
+            background: aqua;
+        }
+
+        .page-carousel .page:nth-child(6) {
+            background: #e536dc;
+        }
+
+        .page-carousel .page:nth-child(7) {
+            background: #9f953c;
+        }
+
+        .page-carousel .page:nth-child(8) {
+            background: #5af593;
+        }
+
+        .page-carousel .page:nth-child(9) {
+            background: #984240;
+        }
+
+        .page-carousel .page:nth-child(10) {
+            background: #1df02f;
+        }
+
+        .page-carousel .page:nth-child(11) {
+            background: #3038b3;
+        }
+    </style>
+    <script src="https://kit.fontawesome.com/5533f0a791.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <!-- TODO: remove div.model and associated CSS -->
+    <!-- <div class="model"></div> -->
+    <div class="app">
+        <div class="page-carousel">
+            <div class="page">
+                <div class="content" style="opacity: 1">01</div>
+            </div>
+            <div class="page">
+                <div class="content">02</div>
+            </div>
+            <div class="page">
+                <div class="content">03</div>
+            </div>
+            <div class="page">
+                <div class="content">04</div>
+            </div>
+            <div class="page">
+                <div class="content">05</div>
+            </div>
+            <div class="page">
+                <div class="content">06</div>
+            </div>
+            <div class="page">
+                <div class="content">07</div>
+            </div>
+            <div class="page">
+                <div class="content">08</div>
+            </div>
+            <div class="page">
+                <div class="content">09</div>
+            </div>
+            <div class="page">
+                <div class="content">10</div>
+            </div>
+            <div class="page">
+                <div class="content">11</div>
+            </div>
+        </div>
+        <div class="blur">
+            <div class="side-menu">
+                <div class="company-logo">
+                    <img src="https://via.placeholder.com/1000x1000?text=N%20x%20N" alt="Target Logo">
+                </div>
+                <div class="menu-separator"></div>
+                <div class="user-logo">
+                    <div class="fa fa-user only-visible"></div>
+                    <a href="#">User</a>
+                </div>
+                <div class="expand">
+                    <div class="fas fa-angle-double-left"></div>
+                </div>
+                <div class="tile" style="background-color: #fff;">
+                    <span class="fas fa-home"></span>
+                </div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+                <div class="tile"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (() => {
+            const app = document.querySelector('.app')
+                , carousel = document.querySelector('.app > .page-carousel')
+                , menu = document.querySelector('.app > .blur > .side-menu')
+                , tiles = document.querySelectorAll(`.app > .blur > .side-menu > .tile`)
+                , contents = document.querySelectorAll(`.app > .page-carousel > .page > .content`)
+                , expand = document.querySelector(`.app > .blur > .side-menu > .expand`)
+                , SCROLL_DELAY = 500; // miliseconds (try to use 500ms as minimum)
+
+            let canScroll = true
+                , direction = 0
+                , currentSlide = 0;
+
+            expand.addEventListener(
+                "click"
+                , event => menu.classList.contains("opened")
+                    ? (
+                        menu.classList.remove("opened")
+                        , contents.forEach(content => content.style.width = "calc(100% - 14rem)")
+                    )
+                    : (
+                        menu.classList.add("opened")
+                        , contents.forEach(content => content.style.width = "calc(100% - 18rem)")
+                    )
+            )
+
+            tiles.forEach((tile, index) => tile.addEventListener(
+                "click"
+                , event => canScroll && (
+                    (   // disable scrolling:
+                        canScroll = false
+                    )
+                    , ( // handle custom scroll:
+                        carousel.scrollTo(0, index * window.innerHeight)
+                    )
+                    , ( // handle current slide:
+                        currentSlide = index
+                    )
+                    , ( // handle CSS:
+                        tiles.forEach(tile => tile.style.backgroundColor = "")
+                        , contents.forEach(content => content.style.opacity = "")
+                        , tiles[currentSlide].style.backgroundColor = "#fff"
+                        , contents[currentSlide].style.opacity = "1"
+                    )
+                    , ( // enable scrolling:
+                        window.setTimeout(() => (canScroll = true, null), SCROLL_DELAY)
+                    )
+                )
+            ))
+
+            app.addEventListener(
+                "wheel",
+                event => (
+                    event.preventDefault()
+                    , canScroll && (
+                        (   // disable scrolling:
+                            canScroll = false
+                        )
+                        , ( // handle custom scroll:
+                            direction = Math.sign(event.deltaY ?? 0)
+                            , carousel.scrollBy(0, direction * window.innerHeight)
+                        )
+                        , ( // handle current slide:
+                            (direction < 0 && currentSlide > 0) && (currentSlide -= 1)
+                            , (direction > 0 && currentSlide < carousel.childElementCount - 1) && (currentSlide += 1)
+                        )
+                        , ( // handle CSS:
+                            tiles.forEach(tile => tile.style.backgroundColor = "")
+                            , contents.forEach(content => content.style.opacity = "")
+                            , tiles[currentSlide].style.backgroundColor = "#fff"
+                            , contents[currentSlide].style.opacity = "1"
+                        )
+                        , ( // enable scrolling:
+                            window.setTimeout(() => (canScroll = true, null), SCROLL_DELAY)
+                        )
+                    )
+                )
+            );
+
+            menu.addEventListener(
+                "wheel"
+                , event => event.stopPropagation()
+            )
+
+            console.log(contents);
+        })()
+    </script>
+</body>
+
+</html>
